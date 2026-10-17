@@ -17,12 +17,12 @@ Parameters:
   NotificationEmail:
     Type: String
     Default: ""
-    Description: Optional verified SES recipient email.
+    Description: Email address receiving contact notifications.
 
   SesFromEmail:
     Type: String
     Default: ""
-    Description: Optional verified SES sender email.
+    Description: Verified SES sender email address.
 
   MessageRetentionDays:
     Type: Number
@@ -91,7 +91,8 @@ Resources:
               - Effect: Allow
                 Action:
                   - ses:SendEmail
-                Resource: "*"
+                Resource:
+                  - arn:aws:ses:eu-central-1:929689740676:identity/ikiuliumov@gmail.com
           - !Ref AWS::NoValue
       Events:
         CreateMessage:
@@ -186,9 +187,8 @@ Resources:
           - true
           - false
       Tags:
-      - Key: App
-        Value: contact-api 
-      
+        - Key: App
+          Value: contact-api
 
 Outputs:
   ApiBaseUrl:

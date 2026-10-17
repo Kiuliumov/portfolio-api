@@ -6,4 +6,3 @@ s3_prefix = "contact-message-api"
 region = "eu-central-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "JwtIssuer=\"https://YOUR-ISSUER.example/\" JwtAudience=\"YOUR-API-AUDIENCE\" AdminClaimName=\"role\" AdminClaimValue=\"admin\" AllowedOrigin=\"https://example.com\" NotificationEmail=\"\" SesFromEmail=\"\" MessageRetentionDays=\"0\""
