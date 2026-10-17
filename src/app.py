@@ -412,6 +412,45 @@ def _update(event):
         },
     )
 
+def _delete(event):
+    message_id = (event.get("pathParameters") or {}).get("id", "")
+
+    if not message_id or len(message_id) > 64:
+        raise ApiError(400, "Invalid message ID.")
+
+    try:
+        result = table.delete_item(
+            Key={"id": message_id},
+            ConditionExpression="attribute_exists(id)",
+            ReturnValues="ALL_OLD",
+        )
+    except ClientError as exc:
+        if (
+            exc.response.get("Error", {}).get("Code")
+            == "ConditionalCheckFailedException"
+        ):
+            raise ApiError(404, "Message not found.")
+
+        raise ApiError(
+            503,
+            "Unable to delete the message right now.",
+        )
+    except BotoCoreError:
+        raise ApiError(
+            503,
+            "Unable to delete the message right now.",
+        )
+
+    if not result.get("Attributes"):
+        raise ApiError(404, "Message not found.")
+
+    return _response(
+        200,
+        {
+            "id": message_id,
+            "deleted": True,
+        },
+    )
 
 def handler(event, context):
     try:
@@ -448,8 +487,20 @@ def handler(event, context):
             _require_admin(token)
             return _update(event)
 
-        return _response(404, {"error": "Not found"})
+        # Protected endpoint: delete a message.
+        # Expected route: DELETE /messages/{token}/{id}
+        if method == "DELETE" and token and message_id:
+            _require_admin(token)
+            return _delete(event)
 
+        # Protected endpoint: delete a message.
+        # Expected route: DELETE /messages/{token}/{id}
+        if method == "DELETE" and token and message_id:
+            _require_admin(token)
+            return _delete(event)        
+        
+        return _response(404, {"error": "Not found"})
+    
     except ApiError as exc:
         return _response(exc.status, {"error": exc.message})
 
