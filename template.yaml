@@ -1,0 +1,204 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless contact-message API (Python, Lambda, HTTP API, DynamoDB, optional SES).
+
+Parameters:
+  AdminToken:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+    Description: Secret token used to protect administrative routes.
+
+  AllowedOrigin:
+    Type: String
+    Default: https://kiuliumov.eu
+    Description: Exact website origin, including scheme and no trailing slash.
+
+  NotificationEmail:
+    Type: String
+    Default: ""
+    Description: Optional verified SES recipient email.
+
+  SesFromEmail:
+    Type: String
+    Default: ""
+    Description: Optional verified SES sender email.
+
+  MessageRetentionDays:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    Description: 0 retains messages indefinitely; otherwise TTL days after creation.
+
+Conditions:
+  EnableEmailNotifications: !And
+    - !Not [!Equals [!Ref NotificationEmail, ""]]
+    - !Not [!Equals [!Ref SesFromEmail, ""]]
+
+  EnableMessageTTL: !Not
+    - !Equals [!Ref MessageRetentionDays, 0]
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 10
+    MemorySize: 256
+    Architectures:
+      - arm64
+    Tracing: Active
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref MessagesTable
+        ADMIN_TOKEN: !Ref AdminToken
+        NOTIFICATION_EMAIL: !Ref NotificationEmail
+        SES_FROM_EMAIL: !Ref SesFromEmail
+        ENABLE_EMAIL: !If
+          - EnableEmailNotifications
+          - "true"
+          - "false"
+        MESSAGE_RETENTION_DAYS: !Ref MessageRetentionDays
+
+Resources:
+  ContactApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: "$default"
+      CorsConfiguration:
+        AllowOrigins:
+          - !Ref AllowedOrigin
+        AllowHeaders:
+          - authorization
+          - content-type
+        AllowMethods:
+          - GET
+          - POST
+          - PATCH
+          - OPTIONS
+        MaxAge: 600
+
+  CreateMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.handler
+      Description: Public contact submission endpoint.
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref MessagesTable
+        - !If
+          - EnableEmailNotifications
+          - Statement:
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                Resource: "*"
+          - !Ref AWS::NoValue
+      Events:
+        CreateMessage:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ContactApi
+            Path: /messages
+            Method: POST
+
+  ListMessagesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.handler
+      Description: Admin message listing endpoint.
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref MessagesTable
+      Events:
+        ListMessages:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ContactApi
+            Path: /messages/{token}
+            Method: GET
+
+  GetMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.handler
+      Description: Admin message detail endpoint.
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref MessagesTable
+      Events:
+        GetMessage:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ContactApi
+            Path: /messages/{token}/{id}
+            Method: GET
+
+  UpdateMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.handler
+      Description: Admin message status update endpoint.
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MessagesTable
+      Events:
+        UpdateMessage:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ContactApi
+            Path: /messages/{token}/{id}
+            Method: PATCH
+
+  MessagesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: gsi1pk
+          AttributeType: S
+        - AttributeName: gsi1sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: ByCreatedAt
+          KeySchema:
+            - AttributeName: gsi1pk
+              KeyType: HASH
+            - AttributeName: gsi1sk
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: !If
+          - EnableMessageTTL
+          - true
+          - false
+      Tags:
+      - Key: App
+        Value: contact-api 
+      
+
+Outputs:
+  ApiBaseUrl:
+    Description: Base URL for the API.
+    Value: !Sub "https://${ContactApi}.execute-api.${AWS::Region}.amazonaws.com"
+
+  MessagesTableName:
+    Description: DynamoDB table name.
+    Value: !Ref MessagesTable
+
+  CreateMessageUrl:
+    Description: Public contact submission URL.
+    Value: !Sub "https://${ContactApi}.execute-api.${AWS::Region}.amazonaws.com/messages"
