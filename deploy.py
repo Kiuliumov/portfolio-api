@@ -110,7 +110,7 @@ def main():
         f"AdminToken={admin_token}",
         "AllowedOrigin=https://kiuliumov.eu",
         "NotificationEmail=ikiuliumov@gmail.com",
-        "SesFromEmail=miti.bania@gmail.com",
+        "SesFromEmail=ikiuliumov@gmail.com",
         "MessageRetentionDays=0",
     ]
 
