@@ -412,6 +412,7 @@ def _update(event):
         },
     )
 
+
 def _delete(event):
     message_id = (event.get("pathParameters") or {}).get("id", "")
 
@@ -425,10 +426,7 @@ def _delete(event):
             ReturnValues="ALL_OLD",
         )
     except ClientError as exc:
-        if (
-            exc.response.get("Error", {}).get("Code")
-            == "ConditionalCheckFailedException"
-        ):
+        if exc.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
             raise ApiError(404, "Message not found.")
 
         raise ApiError(
@@ -451,6 +449,7 @@ def _delete(event):
             "deleted": True,
         },
     )
+
 
 def handler(event, context):
     try:
@@ -497,10 +496,10 @@ def handler(event, context):
         # Expected route: DELETE /messages/{token}/{id}
         if method == "DELETE" and token and message_id:
             _require_admin(token)
-            return _delete(event)        
-        
+            return _delete(event)
+
         return _response(404, {"error": "Not found"})
-    
+
     except ApiError as exc:
         return _response(exc.status, {"error": exc.message})
 

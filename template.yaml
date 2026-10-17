@@ -73,6 +73,7 @@ Resources:
           - GET
           - POST
           - PATCH
+          - DELETE
           - OPTIONS
         MaxAge: 600
 
@@ -152,6 +153,23 @@ Resources:
             ApiId: !Ref ContactApi
             Path: /messages/{token}/{id}
             Method: PATCH
+
+  DeleteMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.handler
+      Description: Admin message deletion endpoint.
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MessagesTable
+      Events:
+        DeleteMessage:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ContactApi
+            Path: /messages/{token}/{id}
+            Method: DELETE
 
   MessagesTable:
     Type: AWS::DynamoDB::Table

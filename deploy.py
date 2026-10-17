@@ -19,10 +19,7 @@ def run_command(command, cwd, env):
 
     command[0] = sam_path
 
-    safe_command = [
-        "<redacted>" if arg.startswith("AdminToken=") else arg
-        for arg in command
-    ]
+    safe_command = ["<redacted>" if arg.startswith("AdminToken=") else arg for arg in command]
 
     print(f"\nRunning: {' '.join(safe_command)}")
 
@@ -37,9 +34,7 @@ def run_command(command, cwd, env):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Build and deploy the contact-message API."
-    )
+    parser = argparse.ArgumentParser(description="Build and deploy the contact-message API.")
     parser.add_argument(
         "admin_token",
         nargs="?",
